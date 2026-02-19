@@ -1,0 +1,500 @@
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Mini ChatGPT</title>
+  <style>
+    :root{
+      --bg:#0b0f14;
+      --panel:#0f1621;
+      --panel2:#111a27;
+      --text:#e8eef7;
+      --muted:#9fb0c6;
+      --border:rgba(255,255,255,.10);
+      --accent:#2f7cff;
+      --good:#2bd576;
+      --bad:#ff4d4d;
+      --shadow: 0 12px 30px rgba(0,0,0,.45);
+      --radius:18px;
+    }
+    *{box-sizing:border-box}
+    body{
+      margin:0;
+      font-family: Arial, Helvetica, sans-serif;
+      background: radial-gradient(900px 600px at 20% 20%, rgba(47,124,255,.15), transparent 60%),
+                  radial-gradient(900px 600px at 80% 30%, rgba(43,213,118,.10), transparent 60%),
+                  var(--bg);
+      color:var(--text);
+      height:100vh;
+      display:flex;
+    }
+    /* Sidebar */
+    .sidebar{
+      width:300px;
+      max-width:38vw;
+      background:linear-gradient(180deg, var(--panel), var(--panel2));
+      border-right:1px solid var(--border);
+      padding:16px;
+      display:flex;
+      flex-direction:column;
+      gap:14px;
+    }
+    .brand{
+      display:flex; align-items:center; justify-content:space-between;
+      gap:10px;
+    }
+    .brand h1{
+      margin:0;
+      font-size:16px;
+      letter-spacing:.5px;
+    }
+    .pill{
+      font-size:12px; color:var(--muted);
+      padding:6px 10px; border:1px solid var(--border);
+      border-radius:999px;
+      background:rgba(255,255,255,.04);
+    }
+    .btn{
+      width:100%;
+      padding:12px 12px;
+      border:none;
+      border-radius:14px;
+      background:rgba(255,255,255,.06);
+      color:var(--text);
+      cursor:pointer;
+      display:flex; align-items:center; justify-content:space-between;
+      transition:.15s;
+    }
+    .btn:hover{ background:rgba(255,255,255,.10); }
+    .btn.primary{
+      background:var(--accent);
+    }
+    .btn.primary:hover{ filter:brightness(1.05); }
+    .list{
+      display:flex; flex-direction:column; gap:8px;
+      overflow:auto;
+      padding-right:4px;
+    }
+    .chat-item{
+      padding:10px 12px;
+      border:1px solid var(--border);
+      border-radius:14px;
+      background:rgba(0,0,0,.10);
+      cursor:pointer;
+      transition:.15s;
+    }
+    .chat-item:hover{ background:rgba(255,255,255,.06); }
+    .chat-item.active{
+      border-color:rgba(47,124,255,.45);
+      background:rgba(47,124,255,.10);
+    }
+    .chat-title{
+      font-size:13px; margin:0 0 6px 0;
+      color:var(--text);
+      white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+    }
+    .chat-meta{
+      font-size:12px; color:var(--muted);
+      white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+    }
+    .sidebar-footer{
+      margin-top:auto;
+      border-top:1px solid var(--border);
+      padding-top:12px;
+      display:flex;
+      flex-direction:column;
+      gap:8px;
+      color:var(--muted);
+      font-size:12px;
+    }
+    /* Main */
+    .main{
+      flex:1;
+      display:flex;
+      flex-direction:column;
+      height:100vh;
+    }
+    .topbar{
+      padding:14px 16px;
+      border-bottom:1px solid var(--border);
+      display:flex; align-items:center; justify-content:space-between;
+      gap:10px;
+      background:rgba(0,0,0,.12);
+      backdrop-filter: blur(8px);
+    }
+    .topbar .title{
+      display:flex; flex-direction:column;
+      gap:3px;
+      min-width:0;
+    }
+    .topbar h2{
+      margin:0; font-size:15px;
+      white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+    }
+    .topbar small{ color:var(--muted); }
+    .actions{
+      display:flex; gap:8px; align-items:center;
+    }
+    .iconbtn{
+      border:1px solid var(--border);
+      background:rgba(255,255,255,.05);
+      color:var(--text);
+      border-radius:12px;
+      padding:10px 12px;
+      cursor:pointer;
+    }
+    .iconbtn:hover{ background:rgba(255,255,255,.10); }
+    .chat{
+      flex:1;
+      overflow:auto;
+      padding:18px 16px 120px;
+      display:flex;
+      flex-direction:column;
+      gap:12px;
+    }
+    .msg{
+      max-width:860px;
+      width:fit-content;
+      padding:12px 14px;
+      border-radius:16px;
+      border:1px solid var(--border);
+      background:rgba(255,255,255,.04);
+      box-shadow: 0 8px 22px rgba(0,0,0,.25);
+      line-height:1.35;
+      white-space:pre-wrap;
+      word-break:break-word;
+    }
+    .msg.user{
+      align-self:flex-end;
+      background:rgba(47,124,255,.14);
+      border-color:rgba(47,124,255,.35);
+    }
+    .msg.bot{
+      align-self:flex-start;
+      background:rgba(255,255,255,.05);
+    }
+    .msg .who{
+      display:block;
+      font-size:12px;
+      color:var(--muted);
+      margin-bottom:6px;
+    }
+
+    /* Composer */
+    .composer{
+      position:fixed;
+      left:300px;
+      right:0;
+      bottom:0;
+      padding:14px 16px;
+      background:linear-gradient(180deg, transparent, rgba(0,0,0,.55) 30%, rgba(0,0,0,.70));
+      backdrop-filter: blur(10px);
+      border-top:1px solid var(--border);
+    }
+    @media (max-width: 900px){
+      .sidebar{ width:260px; }
+      .composer{ left:260px; }
+    }
+    @media (max-width: 720px){
+      body{ flex-direction:column; }
+      .sidebar{ width:100%; max-width:100%; border-right:none; border-bottom:1px solid var(--border); }
+      .composer{ left:0; }
+    }
+    .row{
+      display:flex;
+      gap:10px;
+      align-items:flex-end;
+      max-width:980px;
+      margin:0 auto;
+    }
+    textarea{
+      flex:1;
+      min-height:48px;
+      max-height:140px;
+      resize:none;
+      padding:12px 12px;
+      border-radius:14px;
+      border:1px solid var(--border);
+      outline:none;
+      background:rgba(15,22,33,.85);
+      color:var(--text);
+      font-size:14px;
+      box-shadow: var(--shadow);
+    }
+    .send{
+      min-width:110px;
+      padding:12px 14px;
+      border:none;
+      border-radius:14px;
+      background:var(--accent);
+      color:white;
+      cursor:pointer;
+      box-shadow: var(--shadow);
+      font-weight:600;
+    }
+    .send:hover{ filter:brightness(1.05); }
+    .hint{
+      max-width:980px;
+      margin:8px auto 0;
+      color:var(--muted);
+      font-size:12px;
+      display:flex;
+      justify-content:space-between;
+      gap:10px;
+    }
+    code{
+      background:rgba(255,255,255,.08);
+      padding:2px 6px;
+      border-radius:8px;
+    }
+  </style>
+</head>
+<body>
+  <aside class="sidebar">
+    <div class="brand">
+      <h1>Mini ChatGPT</h1>
+      <span class="pill" id="statusPill">Offline demo</span>
+    </div>
+
+    <button class="btn primary" id="newChatBtn">
+      <span>+ Yangi chat</span>
+      <span style="opacity:.9">Ctrl + N</span>
+    </button>
+
+    <div class="list" id="chatList"></div>
+
+    <div class="sidebar-footer">
+      <div>✅ Hammasi bitta faylda</div>
+      <div>💾 Chatlar saqlanadi: <code>localStorage</code></div>
+      <div>⚠️ Bu real ChatGPT API emas (demo)</div>
+    </div>
+  </aside>
+
+  <main class="main">
+    <div class="topbar">
+      <div class="title">
+        <h2 id="activeTitle">Yangi chat</h2>
+        <small id="activeMeta">Savol yozing, Enter bilan yuboring</small>
+      </div>
+      <div class="actions">
+        <button class="iconbtn" id="exportBtn">Export</button>
+        <button class="iconbtn" id="clearBtn">Clear</button>
+      </div>
+    </div>
+
+    <section class="chat" id="chatBox"></section>
+
+    <div class="composer">
+      <div class="row">
+        <textarea id="input" placeholder="Xabar yozing... (Enter = yuborish, Shift+Enter = yangi qator)"></textarea>
+        <button class="send" id="sendBtn">Yuborish</button>
+      </div>
+      <div class="hint">
+        <span>Masalan: “HTML’da button hover qanday qilinadi?”</span>
+        <span>💡 Ctrl+N: yangi chat</span>
+      </div>
+    </div>
+  </main>
+
+  <script>
+    // ============ Storage helpers ============
+    const KEY = "mini_chatgpt_v1";
+    const now = () => new Date().toLocaleString();
+
+    function loadState(){
+      try{
+        return JSON.parse(localStorage.getItem(KEY)) || null;
+      }catch(e){
+        return null;
+      }
+    }
+    function saveState(state){
+      localStorage.setItem(KEY, JSON.stringify(state));
+    }
+
+    // ============ Default state ============
+    function makeNewChat(){
+      const id = "chat_" + Math.random().toString(16).slice(2) + "_" + Date.now();
+      return {
+        id,
+        title: "Yangi chat",
+        createdAt: now(),
+        messages: [
+          { role:"bot", text:"Salom! Men demo ChatGPTman 🙂\nSavolingizni yozing. Men javobni namunaviy (offline) qilib beraman.\n\nMasalan: 'HTML va CSS bilan oddiy sayt qanaqa qilinadi?'", time: now() }
+        ]
+      };
+    }
+
+    let state = loadState();
+    if(!state){
+      const first = makeNewChat();
+      state = { activeId: first.id, chats: [first] };
+      saveState(state);
+    }
+
+    // ============ UI elements ============
+    const chatList = document.getElementById("chatList");
+    const chatBox  = document.getElementById("chatBox");
+    const activeTitle = document.getElementById("activeTitle");
+    const activeMeta  = document.getElementById("activeMeta");
+    const input = document.getElementById("input");
+    const sendBtn = document.getElementById("sendBtn");
+
+    const newChatBtn = document.getElementById("newChatBtn");
+    const clearBtn = document.getElementById("clearBtn");
+    const exportBtn = document.getElementById("exportBtn");
+
+    // ============ Render ============
+    function getActiveChat(){
+      return state.chats.find(c => c.id === state.activeId) || state.chats[0];
+    }
+
+    function renderSidebar(){
+      chatList.innerHTML = "";
+      state.chats.forEach(c => {
+        const div = document.createElement("div");
+        div.className = "chat-item" + (c.id === state.activeId ? " active":"");
+        div.onclick = () => {
+          state.activeId = c.id;
+          saveState(state);
+          renderAll();
+        };
+        const last = c.messages[c.messages.length-1]?.text || "";
+        div.innerHTML = `
+          <p class="chat-title">${escapeHtml(c.title)}</p>
+          <div class="chat-meta">${escapeHtml(last.slice(0,60))}${last.length>60?"…":""}</div>
+        `;
+        chatList.appendChild(div);
+      });
+    }
+
+    function renderChat(){
+      const c = getActiveChat();
+      activeTitle.textContent = c.title;
+      activeMeta.textContent = "Yaratilgan: " + c.createdAt + " • Xabarlar: " + c.messages.length;
+
+      chatBox.innerHTML = "";
+      c.messages.forEach(m => {
+        const div = document.createElement("div");
+        div.className = "msg " + (m.role === "user" ? "user":"bot");
+        div.innerHTML = `<span class="who">${m.role === "user" ? "Siz" : "Assistant"} • ${m.time}</span>${formatText(m.text)}`;
+        chatBox.appendChild(div);
+      });
+
+      // scroll bottom
+      chatBox.scrollTop = chatBox.scrollHeight;
+    }
+
+    function renderAll(){
+      renderSidebar();
+      renderChat();
+    }
+
+    // ============ Text helpers ============
+    function escapeHtml(str){
+      return str.replace(/[&<>"']/g, s => ({
+        "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"
+      }[s]));
+    }
+    function formatText(text){
+      // very simple code formatting: wrap `code` as <code>
+      const safe = escapeHtml(text);
+      return safe.replace(/`([^`]+)`/g, "<code>$1</code>");
+    }
+
+    // ============ Offline "bot" logic ============
+    function offlineReply(userText){
+      const t = userText.toLowerCase();
+
+      if(t.includes("html") && t.includes("css") && (t.includes("sayt") || t.includes("website"))){
+        return "Oddiy sayt qilish:\n1) `index.html`\n2) `style.css`\n3) Brauzerda ochish: html faylni 2 marta bosish.\n4) Internetga: GitHub Pages/Netlify.\n\nXohlasangiz men sizga tayyor shablon ham beraman.";
+      }
+      if(t.includes("hover")){
+        return "Hover effekt:\nCSS’da:\n`button:hover { transform: scale(1.05); }`\n\nYoki rang o‘zgartirish:\n`a:hover { background:#2f7cff; }`";
+      }
+      if(t.includes("github") && t.includes("pages")){
+        return "GitHub Pages:\nRepo → Settings → Pages → Deploy from a branch → `main` + `/root` → Save.\nKeyin link: `https://username.github.io/repo/`";
+      }
+      if(t.includes("salom") || t.includes("assalomu")){
+        return "Va alaykum assalom 🙂 Savolingizni yozing.";
+      }
+      return "Men offline demo javob beraman 🙂\n\nSavolingiz:\n- HTML/CSS\n- JavaScript\n- GitHub Pages\n- Telegram bot nomlari\n\nQaysi mavzuda yordam kerak?";
+    }
+
+    function sendMessage(){
+      const text = input.value.trim();
+      if(!text) return;
+
+      const c = getActiveChat();
+      c.messages.push({ role:"user", text, time: now() });
+
+      // title auto: first user message
+      if(c.title === "Yangi chat"){
+        c.title = text.length > 28 ? text.slice(0,28) + "…" : text;
+      }
+
+      // bot reply
+      const reply = offlineReply(text);
+      c.messages.push({ role:"bot", text: reply, time: now() });
+
+      input.value = "";
+      saveState(state);
+      renderAll();
+    }
+
+    // ============ Buttons ============
+    sendBtn.onclick = sendMessage;
+
+    input.addEventListener("keydown", (e) => {
+      if(e.key === "Enter" && !e.shiftKey){
+        e.preventDefault();
+        sendMessage();
+      }
+    });
+
+    newChatBtn.onclick = () => {
+      const nc = makeNewChat();
+      state.chats.unshift(nc);
+      state.activeId = nc.id;
+      saveState(state);
+      renderAll();
+      input.focus();
+    };
+
+    clearBtn.onclick = () => {
+      const c = getActiveChat();
+      if(!confirm("Shu chatdagi hamma xabar o‘chsinmi?")) return;
+      c.messages = [{ role:"bot", text:"Chat tozalandi. Yangi savol yozing 🙂", time: now() }];
+      c.title = "Yangi chat";
+      saveState(state);
+      renderAll();
+    };
+
+    exportBtn.onclick = () => {
+      const c = getActiveChat();
+      const data = {
+        title: c.title,
+        createdAt: c.createdAt,
+        messages: c.messages
+      };
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type:"application/json" });
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = (c.title.replace(/[^\w]+/g,"_") || "chat") + ".json";
+      a.click();
+      URL.revokeObjectURL(a.href);
+    };
+
+    // Ctrl+N new chat
+    window.addEventListener("keydown", (e) => {
+      if((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "n"){
+        e.preventDefault();
+        newChatBtn.click();
+      }
+    });
+
+    renderAll();
+  </script>
+</body>
+</html>
